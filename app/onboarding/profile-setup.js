@@ -21,7 +21,7 @@ import {
   typography,
 } from "../../lib/theme";
 import * as FileSystem from "expo-file-system/legacy";
-import { API_URL } from "../../lib/lib/config";
+import { API_URL } from "../../lib/config";
 
 export default function ProfileSetupScreen() {
   const { session, supabase } = useAuth();
