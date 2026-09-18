@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -32,9 +34,30 @@ export default function ProfileSetupScreen() {
   });
   const [profileImage, setProfileImage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+  // y-position of each input within the scroll content, captured via
+  // onLayout so focusing one can scroll it into view above the keyboard
+  // without hardcoding offsets that would drift if the layout changes.
+  const fieldY = useRef({});
 
   const updateField = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // KeyboardAvoidingView resizes the scroll area once the keyboard opens,
+  // but it doesn't know which input the person is actually looking at — it
+  // can shrink the view right out from under the focused field. Scrolling
+  // explicitly on focus is what actually brings that field into the
+  // visible area. Delayed because the resize triggered by KAV hasn't
+  // finished at the moment focus fires; scrolling immediately targets the
+  // pre-keyboard layout and lands short.
+  const scrollToField = (key) => {
+    setTimeout(() => {
+      const y = fieldY.current[key];
+      if (y != null) {
+        scrollRef.current?.scrollTo({ y: Math.max(0, y - 16), animated: true });
+      }
+    }, 250);
   };
 
   const pickImage = async () => {
@@ -123,7 +146,7 @@ export default function ProfileSetupScreen() {
 
       if (error) return Alert.alert("Error", error.message);
 
-      router.push("/onboarding/education");
+      router.push("/onboarding/age-verify");
     } catch (e) {
       Alert.alert(
         "Error",
@@ -135,69 +158,111 @@ export default function ProfileSetupScreen() {
   };
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <Text style={styles.wordmark}>loam</Text>
-      <Text style={styles.title}>Set up your profile</Text>
-      <Text style={styles.subtitle}>
-        This is how other people will find and recognize you.
-      </Text>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.scroll}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.wordmark}>loam</Text>
+        <Text style={styles.title}>Set up your profile</Text>
+        <Text style={styles.subtitle}>
+          This is how other people will find and recognize you.
+        </Text>
 
-      <View style={styles.uploaderContainer}>
-        <View style={styles.imagePreviewWrapper}>
-          {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
-          ) : (
-            <View style={styles.profileImagePlaceholder} />
-          )}
+        <View style={styles.uploaderContainer}>
+          <View style={styles.imagePreviewWrapper}>
+            {profileImage ? (
+              <Image
+                source={{ uri: profileImage }}
+                style={styles.profileImage}
+              />
+            ) : (
+              <View style={styles.profileImagePlaceholder} />
+            )}
+          </View>
+          <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
+            <Text style={styles.uploadButtonText}>
+              {profileImage ? "Edit Profile Image" : "Add Profile Image"}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-          <Text style={styles.uploadButtonText}>
-            {profileImage ? "Edit Profile Image" : "Add Profile Image"}
+
+        <View style={styles.form}>
+          <View
+            onLayout={(e) => {
+              fieldY.current.username = e.nativeEvent.layout.y;
+            }}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor={colors.brown200}
+              value={form.username}
+              onChangeText={(v) =>
+                updateField(
+                  "username",
+                  v.toLowerCase().replace(/[^a-z0-9_]/g, ""),
+                )
+              }
+              autoCapitalize="none"
+              onFocus={() => scrollToField("username")}
+            />
+          </View>
+          <View
+            onLayout={(e) => {
+              fieldY.current.displayName = e.nativeEvent.layout.y;
+            }}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="Display name"
+              placeholderTextColor={colors.brown200}
+              value={form.displayName}
+              onChangeText={(v) => updateField("displayName", v)}
+              onFocus={() => scrollToField("displayName")}
+            />
+          </View>
+          <View
+            onLayout={(e) => {
+              fieldY.current.bio = e.nativeEvent.layout.y;
+            }}
+          >
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              placeholder="Bio (optional)"
+              placeholderTextColor={colors.brown200}
+              value={form.bio}
+              onChangeText={(v) => updateField("bio", v)}
+              onFocus={() => scrollToField("bio")}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleNext}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Saving..." : "Next"}
           </Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Username"
-          placeholderTextColor={colors.brown200}
-          value={form.username}
-          onChangeText={(v) =>
-            updateField("username", v.toLowerCase().replace(/[^a-z0-9_]/g, ""))
-          }
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Display name"
-          placeholderTextColor={colors.brown200}
-          value={form.displayName}
-          onChangeText={(v) => updateField("displayName", v)}
-        />
-        <TextInput
-          style={[styles.input, styles.bioInput]}
-          placeholder="Bio (optional)"
-          placeholderTextColor={colors.brown200}
-          value={form.bio}
-          onChangeText={(v) => updateField("bio", v)}
-          multiline
-          numberOfLines={3}
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handleNext}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>{loading ? "Saving..." : "Next"}</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   scroll: layout.screen,
   container: layout.screenContent,
   wordmark: layout.wordmark,

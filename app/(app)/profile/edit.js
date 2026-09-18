@@ -16,6 +16,7 @@ import { useAuth } from "../../../lib/stores/auth";
 import Button from "../../../lib/components/Button";
 import { colors, typography, spacing, fonts } from "../../../lib/theme";
 import { API_URL } from "../../../lib/config";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export default function EditProfileScreen() {
   const { supabase, session } = useAuth();
@@ -145,8 +146,12 @@ export default function EditProfileScreen() {
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       {/* Header actions */}
       <View style={styles.actions}>
-        <TouchableOpacity onPress={() => router.replace("/(app)/profile")}>
-          <Text style={styles.backText}>← Back</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+          hitSlop={12}
+        >
+          <MaterialIcons name="arrow-back" size={24} color={colors.brown500} />
         </TouchableOpacity>
         <Button
           size="small"
@@ -240,9 +245,11 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: spacing.md,
   },
-  backText: {
-    ...typography.hg16,
-    color: colors.brown500,
+  backButton: {
+    width: 32,
+    height: 32,
+    alignItems: "flex-start",
+    justifyContent: "center",
   },
   uploader: {
     alignItems: "center",

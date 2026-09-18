@@ -1,20 +1,9 @@
-import { Tabs } from "expo-router";
-import { colors } from "../../lib/theme";
+import { Stack } from "expo-router";
 
+// Everything under (app) now lives in one real Stack, so any screen —
+// reached from any tab — pushes/pops with genuine, linear history.
+// The (tabs) group is itself just one Stack screen; the actual bottom
+// tab bar lives in (tabs)/_layout.js.
 export default function AppLayout() {
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: colors.brown50 },
-        tabBarActiveTintColor: colors.brown500,
-        tabBarInactiveTintColor: colors.brown300,
-      }}
-    >
-      <Tabs.Screen name="feed" options={{ title: "Home" }} />
-      <Tabs.Screen name="create-post" options={{ title: "Post" }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
-      <Tabs.Screen name="profile/edit" options={{ href: null }} />
-    </Tabs>
-  );
+  return <Stack screenOptions={{ headerShown: false }} />;
 }

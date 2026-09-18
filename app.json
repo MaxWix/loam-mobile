@@ -1,15 +1,22 @@
 {
   "expo": {
-    "name": "loam-mobile",
+    "scheme": "loammobile",
+    "name": "Loam",
     "slug": "loam-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "ing.loam.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
+      "package": "ing.loam.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -22,7 +29,34 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Loam needs access to your photo library so you can add a photo to your post."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Loam needs access to your camera so you can take photos for your posts."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#462B01"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bfaf41e4-8994-4728-8c3d-37a10f215970"
+      }
+    }
   }
 }

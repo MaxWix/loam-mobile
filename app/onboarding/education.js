@@ -1,10 +1,8 @@
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { router } from "expo-router";
 import { colors, layout, buttons, spacing, typography } from "../../lib/theme";
-import { useAuth } from "../../lib/stores/auth";
 
 export default function EducationScreen() {
-  const { supabase, session } = useAuth();
   return (
     <View style={styles.container}>
       <Text style={styles.wordmark}>loam</Text>
@@ -20,13 +18,7 @@ export default function EducationScreen() {
 
       <TouchableOpacity
         style={styles.button}
-        onPress={() => {
-          supabase
-            .from("profiles")
-            .update({ onboarding_complete: true })
-            .eq("id", session.user.id)
-            .then(() => router.replace("/(app)/feed"));
-        }}
+        onPress={() => router.push("/onboarding/notifications")}
       >
         <Text style={styles.buttonText}>Next</Text>
       </TouchableOpacity>

@@ -37,7 +37,7 @@ export default function WelcomeScreen() {
     if (currentSlide < SLIDES.length - 1) {
       setCurrentSlide(currentSlide + 1);
     } else {
-      router.push("/onboarding/signup");
+      router.push("/onboarding/age-verify");
     }
   };
 
