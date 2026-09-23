@@ -8,8 +8,13 @@ import {
   ScrollView,
   Alert,
   Animated,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
+
+// Adjust if your web app serves these at different paths.
+const TERMS_URL = "https://loam.ing/terms";
+const PRIVACY_URL = "https://loam.ing/privacy";
 import { useAuth } from "../../lib/stores/auth";
 import {
   colors,
@@ -265,7 +270,21 @@ export default function AuthScreen() {
               </TouchableOpacity>
 
               <Text style={styles.disclaimer}>
-                We'll set up your profile right after.
+                By continuing you agree to our{" "}
+                <Text
+                  style={styles.disclaimerLink}
+                  onPress={() => Linking.openURL(TERMS_URL)}
+                >
+                  Terms of Service
+                </Text>{" "}
+                and{" "}
+                <Text
+                  style={styles.disclaimerLink}
+                  onPress={() => Linking.openURL(PRIVACY_URL)}
+                >
+                  Privacy Policy
+                </Text>
+                . We'll set up your profile right after.
               </Text>
             </>
           )}
@@ -383,5 +402,9 @@ const styles = StyleSheet.create({
     color: colors.brown300,
     textAlign: "center",
     fontStyle: "italic",
+  },
+  disclaimerLink: {
+    color: colors.brown500,
+    textDecorationLine: "underline",
   },
 });

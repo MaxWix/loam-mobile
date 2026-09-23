@@ -18,7 +18,6 @@ import FadeInScreen from "../../../lib/components/FadeInScreen";
 import { DEFAULT_EMOJI_TONE } from "../../../lib/utils/emojiAssets";
 import { API_URL } from "../../../lib/config";
 import { colors, fonts, spacing } from "../../../lib/theme";
-import ReactorsStrip from "../../../lib/components/ReactorStrip";
 
 // Single-post version of the feed: same PostCard, same reactions/comments
 // behavior, just for one post reached from a profile item or a
@@ -36,8 +35,6 @@ export default function PostDetailScreen() {
   const [notFound, setNotFound] = useState(false);
   const scrollRef = useRef(null);
   const commentsYRef = useRef(0);
-  const [reactorDetails, setReactorDetails] = useState([]);
-  const [canViewReactors, setCanViewReactors] = useState(false);
 
   const token = session?.access_token;
 
@@ -47,21 +44,17 @@ export default function PostDetailScreen() {
     setNotFound(false);
 
     try {
-      const [postResult, viewerResult, reactionsRes, reactorsRes] =
-        await Promise.all([
-          supabase.from("posts").select("*").eq("id", id).single(),
-          supabase
-            .from("profiles")
-            .select("emoji_skin_tone, profile_img")
-            .eq("id", session.user.id)
-            .single(),
-          fetch(`${API_URL}/api/posts/${id}/reactions`, {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          }).catch(() => null),
-          fetch(`${API_URL}/api/posts/${id}/reactions?detailed=1`, {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          }).catch(() => null),
-        ]);
+      const [postResult, viewerResult, reactionsRes] = await Promise.all([
+        supabase.from("posts").select("*").eq("id", id).single(),
+        supabase
+          .from("profiles")
+          .select("emoji_skin_tone, profile_img")
+          .eq("id", session.user.id)
+          .single(),
+        fetch(`${API_URL}/api/posts/${id}/reactions`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).catch(() => null),
+      ]);
 
       if (postResult.error || !postResult.data) {
         console.warn("Post lookup failed:", postResult.error);
@@ -94,15 +87,6 @@ export default function PostDetailScreen() {
       if (reactionsRes?.ok) {
         const body = await reactionsRes.json();
         reactions = body.reactions || [];
-      }
-
-      if (reactorsRes?.ok) {
-        const body = await reactorsRes.json();
-        setCanViewReactors(!!body.can_view_reactors);
-        setReactorDetails(body.reactor_details || []);
-      } else {
-        setCanViewReactors(false);
-        setReactorDetails([]);
       }
 
       setPost({
@@ -187,6 +171,7 @@ export default function PostDetailScreen() {
                 })
               }
               onRemoved={handleRemoved}
+              onAuthorBlocked={() => router.back()}
             />
 
             <View
@@ -195,16 +180,6 @@ export default function PostDetailScreen() {
                 commentsYRef.current = e.nativeEvent.layout.y;
               }}
             >
-              {canViewReactors && reactorDetails.length > 0 && (
-                <>
-                  <ReactorsStrip
-                    reactors={reactorDetails}
-                    badgeBorderColor={colors.white200} // match this screen's background
-                  />
-                  <View style={styles.reactorsDivider} />
-                </>
-              )}
-
               <PostComments
                 postId={post.id}
                 token={token}
@@ -220,12 +195,6 @@ export default function PostDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  reactorsDivider: {
-    height: 1,
-    backgroundColor: colors.brown100,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-  },
   flex: {
     flex: 1,
   },

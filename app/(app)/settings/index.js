@@ -81,6 +81,10 @@ export default function SettingsScreen() {
           label="Connect your Phone Number"
           onPress={() => router.push("/(app)/settings/phone")}
         />
+        <SettingsRow
+          label="Blocked Users"
+          onPress={() => router.push("/(app)/settings/blocked")}
+        />
         {isAdmin && (
           <SettingsRow
             label="Platform Admin"

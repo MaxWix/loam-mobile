@@ -8,6 +8,7 @@ import {
 } from "../../lib/utils/pushTokens";
 import { colors, layout, buttons, spacing, typography } from "../../lib/theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PHONE_VERIFICATION_ENABLED } from "../../lib/config";
 
 // The only place Loam asks for notification permission. Two reasons it
 // looks like this:
@@ -25,14 +26,14 @@ export default function NotificationsOnboardingScreen() {
   const { next } = useLocalSearchParams();
   const [working, setWorking] = useState(false);
 
-  const goNext = () => {
-    if (next === "feed") {
-      router.replace("/(app)/feed");
-    } else if (PHONE_VERIFICATION_ENABLED) {
-      router.push("/onboarding/verify-phone?next=contacts");
-    } else {
-      router.push("/onboarding/contacts");
-    }
+  const goNext = async () => {
+    // Phone + contact sync are parked for now — this screen is the last
+    // onboarding step, so it owns marking onboarding complete.
+    await supabase
+      .from("profiles")
+      .update({ onboarding_complete: true })
+      .eq("id", session.user.id);
+    router.replace("/(app)/feed");
   };
 
   const handleSkip = async () => {

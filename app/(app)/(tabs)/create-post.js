@@ -9,6 +9,8 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  Keyboard,
+  Animated,
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import PagerView from "react-native-pager-view";
@@ -34,6 +36,7 @@ import Input from "../../../lib/components/Input";
 import CameraSection from "../../../lib/components/CameraSection";
 import FadeInScreen from "../../../lib/components/FadeInScreen";
 import BranchButton from "../../../lib/components/BranchButton";
+import BlobScene from "../../../lib/components/BlobScene";
 import WhiteOnBrownLogo from "../../../assets/whiteOnBrownLogo.svg";
 
 const POST_TABS = [
@@ -50,16 +53,17 @@ const SEARCH_PLACEHOLDERS = {
   reading: "Search for books...",
 };
 
+// Same organic blob as PostCard's CARD_BLOB_PATH, so the create-post
+// preview has the same hand-drawn edges as the card it'll become.
+const CARD_BLOB_PATH =
+  "M8.89625 347.555C-8.76673 336.514 4.74257 81.5901 8.16367 21.794C8.5866 14.4018 13.9813 8.49062 21.3318 7.59935C53.6813 3.67685 150.966 -4.93056 334.343 3.73077C373.519 5.58116 359.107 276.701 355.063 342.04C354.563 350.115 348.148 356.384 340.066 356.742C279.454 359.425 42.3656 368.476 8.89625 347.555Z";
+
 const BG_COLORS = {
   F5F5E1: colors.lime300,
   F5EDEB: colors.clay100,
   ECEDE2: colors.green100,
   F3EEE4: colors.brown100,
 };
-
-// Same organic blob as PostCard's CARD_BLOB_PATH
-const CARD_BLOB_PATH =
-  "M8.89625 347.555C-8.76673 336.514 4.74257 81.5901 8.16367 21.794C8.5866 14.4018 13.9813 8.49062 21.3318 7.59935C53.6813 3.67685 150.966 -4.93056 334.343 3.73077C373.519 5.58116 359.107 276.701 355.063 342.04C354.563 350.115 348.148 356.384 340.066 356.742C279.454 359.425 42.3656 368.476 8.89625 347.555Z";
 
 function getSubtitleFromResult(item, category) {
   if (category === "listening") {
@@ -94,6 +98,16 @@ export default function CreatePostScreen() {
   const [selectedBranchId, setSelectedBranchId] = useState(null);
   const searchTimeout = useRef(null);
   const pagerRef = useRef(null);
+  // Continuous page position (2.4 = 40% of the way from page 2 to 3),
+  // fed by onPageScroll below. BlobScene interpolates off it so the
+  // background blobs track a swipe in progress rather than snapping
+  // once it settles — and a tab tap animates the pager, which drives
+  // the same value, so both inputs share one animation path.
+  const pageProgress = useRef(new Animated.Value(0)).current;
+  // Per-tab refs so the caption can be scrolled into view on focus —
+  // PagerView keeps every page mounted, so these are keyed by tab id.
+  const scrollRefs = useRef({});
+  const captionRefs = useRef({});
 
   const token = session?.access_token;
 
@@ -154,13 +168,37 @@ export default function CreatePostScreen() {
     if (index === -1) return;
     handleTabChange(tabId);
     pagerRef.current?.setPage(index);
+    settleProgress(index);
   };
 
   // Swiping the pager: the source of truth for swipe-driven tab changes.
   // Guarded against firing again when the page change was caused by a
   // tab tap (which already updated activeTab above).
+  // Tracks whether onPageScroll is actually firing. It doesn't on every
+  // PagerView build (notably under the New Architecture), and since it's
+  // the only thing that moved pageProgress, the blobs stayed pinned at
+  // page 0 — invisible, but still laid out over the screen. When it
+  // isn't firing we fall back to animating on page *selection* instead.
+  const pageScrollWorks = useRef(false);
+
+  const onPageScroll = (e) => {
+    const { position, offset } = e.nativeEvent;
+    pageScrollWorks.current = true;
+    pageProgress.setValue(position + offset);
+  };
+
+  const settleProgress = (index) => {
+    if (pageScrollWorks.current) return; // the live scroll already has it
+    Animated.timing(pageProgress, {
+      toValue: index,
+      duration: 320,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const onPageSelected = (e) => {
     const index = e.nativeEvent.position;
+    settleProgress(index);
     const tabId = POST_TABS[index]?.id;
     if (tabId && tabId !== activeTab) {
       handleTabChange(tabId);
@@ -374,6 +412,26 @@ export default function CreatePostScreen() {
     }
   };
 
+  // The caption sits near the bottom of a tall form (image + title +
+  // color + branches), so on focus we explicitly scroll it up into the
+  // space the keyboard insets opened. measureLayout gives its y within
+  // the ScrollView's content; the short delay lets the keyboard's own
+  // inset animation start first so we scroll against the final height.
+  const handleCaptionFocus = (tabId) => {
+    setTimeout(() => {
+      const scroll = scrollRefs.current[tabId];
+      const caption = captionRefs.current[tabId];
+      if (!scroll || !caption) return;
+      caption.measureLayout(
+        scroll.getInnerViewNode(),
+        (_x, y) => {
+          scroll.scrollTo({ y: Math.max(0, y - 80), animated: true });
+        },
+        () => {},
+      );
+    }, 120);
+  };
+
   const displayImage = imageUri || imageUrl;
 
   // Renders the search/form/color/branch/toggle content for a specific
@@ -428,15 +486,21 @@ export default function CreatePostScreen() {
 
         {/* Post form */}
         {showFormLocal && (
-          <View style={[styles.previewCard]}>
+          <View style={styles.previewCard}>
+            {/* Organic card edge — matches PostCard: the blob is sliced
+                to cover, and previewCard clips it so it can't paint
+                past the card's bounds. pointerEvents none so it never
+                eats taps meant for the fields on top of it. */}
             <Svg
               style={StyleSheet.absoluteFill}
               viewBox="0 0 361 361"
-              preserveAspectRatio="none"
+              preserveAspectRatio="xMidYMid slice"
               pointerEvents="none"
             >
               <Path d={CARD_BLOB_PATH} fill={bgColor} />
             </Svg>
+
+            {/* Reset selected item */}
             {hasSelectedItem && (
               <TouchableOpacity style={styles.trashButton} onPress={resetForm}>
                 <Text style={styles.trashText}>✕</Text>
@@ -499,11 +563,15 @@ export default function CreatePostScreen() {
                 onChangeText={setTitle}
                 placeholder="Write a title"
                 organic
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
+                onSubmitEditing={() => Keyboard.dismiss()}
               />
             ) : null}
 
             {/* Caption */}
             <View
+              ref={(r) => (captionRefs.current[tabId] = r)}
               style={[
                 styles.captionWrapper,
                 { height: captionContainerHeight || undefined },
@@ -532,6 +600,10 @@ export default function CreatePostScreen() {
                 placeholder="Write a caption"
                 placeholderTextColor={colors.brown300}
                 multiline
+                returnKeyType="done"
+                submitBehavior="blurAndSubmit"
+                onSubmitEditing={() => Keyboard.dismiss()}
+                onFocus={() => handleCaptionFocus(tabId)}
                 scrollEnabled={captionContainerHeight >= 20 * 15}
                 onContentSizeChange={(e) => {
                   const h = Math.min(
@@ -634,23 +706,43 @@ export default function CreatePostScreen() {
         {/* Swipeable tab content — one page per tab, each with its own
             vertical ScrollView since PagerView only handles the
             horizontal swipe. */}
-        <PagerView
-          ref={pagerRef}
-          style={styles.pager}
-          initialPage={0}
-          onPageSelected={onPageSelected}
-        >
-          {POST_TABS.map((tab) => (
-            <ScrollView
-              key={tab.id}
-              style={styles.scroll}
-              contentContainerStyle={styles.container}
-              keyboardShouldPersistTaps="handled"
-            >
-              {renderTabBody(tab.id)}
-            </ScrollView>
-          ))}
-        </PagerView>
+        {/* The pager gets its own wrapper on purpose. On iOS,
+            react-native-pager-view re-inserts its native view during
+            layout, which lifts it above any *sibling* — so a decorative
+            layer rendered beside it (before OR after) ends up buried.
+            Isolating the pager in a wrapper keeps that reordering
+            contained; the blob scene is a sibling of the wrapper, not of
+            the pager, and stays on top. */}
+        <View style={styles.pagerWrap}>
+          <PagerView
+            ref={pagerRef}
+            style={styles.pager}
+            initialPage={0}
+            onPageSelected={onPageSelected}
+            onPageScroll={onPageScroll}
+          >
+            {POST_TABS.map((tab) => (
+              <ScrollView
+                key={tab.id}
+                ref={(r) => (scrollRefs.current[tab.id] = r)}
+                style={styles.scroll}
+                contentContainerStyle={styles.container}
+                keyboardShouldPersistTaps="handled"
+                // iOS: grow the scrollable area by the keyboard height so
+                // there's somewhere to scroll the caption to. Android needs
+                // softwareKeyboardLayoutMode: "resize" in app.json instead.
+                automaticallyAdjustKeyboardInsets
+                keyboardDismissMode="interactive"
+              >
+                {renderTabBody(tab.id)}
+              </ScrollView>
+            ))}
+          </PagerView>
+        </View>
+
+        {/* Ambient media-tab blobs — decorative overlay. pointerEvents
+            none keeps every swipe, tab and control fully interactive. */}
+        <BlobScene progress={pageProgress} />
       </View>
 
       {/* Actions — pinned to the bottom of the screen rather than
@@ -677,11 +769,16 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  pagerWrap: {
+    flex: 1,
+  },
   pager: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   scroll: {
     flex: 1,
+    backgroundColor: "transparent",
   },
   container: {
     paddingHorizontal: spacing.screenHorizontal,
@@ -712,9 +809,13 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   previewCard: {
-    padding: spacing.md,
+    padding: spacing.lg,
     gap: spacing.sm,
     position: "relative",
+    // Matches PostCard's cardBody so the sliced blob is clipped the
+    // same way and the content sits at the same inset.
+    borderRadius: radius.lg,
+    overflow: "hidden",
   },
   trashButton: {
     alignSelf: "flex-end",

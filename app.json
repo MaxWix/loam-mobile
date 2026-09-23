@@ -8,7 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "ing.loam.mobile",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -39,9 +39,17 @@
         }
       ],
       [
+        "expo-contacts",
+        {
+          "contactsPermission": "Loam checks which of your contacts are already on Loam so you can connect with them. Contacts are scrambled on your device before being checked."
+        }
+      ],
+      [
         "expo-camera",
         {
-          "cameraPermission": "Loam needs access to your camera so you can take photos for your posts."
+          "cameraPermission": "Loam needs access to your camera so you can take photos for your posts.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [

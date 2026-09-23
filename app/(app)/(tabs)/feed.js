@@ -23,10 +23,9 @@ import WhiteOnBrownLogo from "../../../assets/whiteOnBrownLogo.svg";
 import { colors, fonts, spacing } from "../../../lib/theme";
 import FadeInScreen from "../../../lib/components/FadeInScreen";
 
-const HEADER_WAVE_PATH =
-  "M0 0 L390 0 L390 8 C320 24, 240 12, 195 18 C150 24, 70 10, 0 20 Z";
-const HEADER_WAVE_HEIGHT = 24;
-
+// Same 72h cutoff logic used on the notifications screen, so the badge
+// and the list agree on what counts as "new."
+// Same blob shape used as the web app's notifications-bell mask
 const BELL_BLOB_PATH =
   "M38.0571 18.4656C38.0571 28.1925 28.0073 37 16.9143 37C5.82125 37 0 28.1925 0 18.4656C0 8.7388 10.0498 0 21.1429 0C32.2359 0 38.0571 8.7388 38.0571 18.4656Z";
 
@@ -81,20 +80,41 @@ export default function FeedScreen() {
       });
       if (res.ok) {
         const data = await res.json();
-        setBranches(
-          (data.branches || []).map((b) => ({
-            id: b.id,
-            name: b.name || "Unnamed",
-            emoji: b.emoji || "✨",
-            color: b.color || "B6AFA3",
-            memberIds: (b.members || []).map((m) => m.id),
-          })),
-        );
+        const base = (data.branches || []).map((b) => ({
+          id: b.id,
+          name: b.name || "Unnamed",
+          emoji: b.emoji || "✨",
+          color: b.color || "B6AFA3",
+          memberIds: (b.members || []).map((m) => m.id),
+          members: b.members || [],
+        }));
+
+        // Branch member rows carry no profile_img — the member id is a
+        // profile id, so join images in one profiles query across every
+        // branch, then hand the enriched members to the pill facepile.
+        const ids = [
+          ...new Set(base.flatMap((b) => b.members.map((m) => m.id))),
+        ].filter(Boolean);
+        if (ids.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id, username, profile_img")
+            .in("id", ids);
+          const byId = Object.fromEntries((profs || []).map((p) => [p.id, p]));
+          setBranches(
+            base.map((b) => ({
+              ...b,
+              members: b.members.map((m) => ({ ...m, ...(byId[m.id] || {}) })),
+            })),
+          );
+        } else {
+          setBranches(base);
+        }
       }
     } catch (e) {
       console.warn("Failed to load branches", e);
     }
-  }, [token]);
+  }, [token, supabase]);
 
   // Deletion works directly from the feed (unlike creation, which routes
   // to Connections where the full member-picker UI lives). Throws on
@@ -183,6 +203,12 @@ export default function FeedScreen() {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
   };
 
+  // Blocking hides everything of theirs immediately; the server keeps
+  // them out of future feed responses.
+  const handleAuthorBlocked = (authorId) => {
+    setPosts((prev) => prev.filter((p) => p.author?.id !== authorId));
+  };
+
   return (
     <FadeInScreen>
       <View style={styles.container}>
@@ -209,14 +235,6 @@ export default function FeedScreen() {
             </TouchableOpacity>
             {hasNotifications && <View style={styles.notificationBadge} />}
           </View>
-          <Svg
-            style={styles.headerWave}
-            viewBox="0 0 390 24"
-            preserveAspectRatio="none"
-            pointerEvents="none"
-          >
-            <Path d={HEADER_WAVE_PATH} fill={colors.white200} />
-          </Svg>
         </View>
 
         {loading ? (
@@ -271,6 +289,7 @@ export default function FeedScreen() {
                   viewerMusicService={viewerProfile?.music_service}
                   onCommentsPress={openComments}
                   onRemoved={handlePostRemoved}
+                  onAuthorBlocked={handleAuthorBlocked}
                   onToneChange={(t) =>
                     setViewerProfile((prev) => ({
                       ...(prev || {}),
@@ -297,6 +316,7 @@ export default function FeedScreen() {
           visible={commentsOpen}
           onClose={closeComments}
           viewerProfileImg={viewerProfile?.profile_img}
+          viewerId={session?.user?.id}
         />
 
         <EmojiPreferenceModal
@@ -331,16 +351,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screenHorizontal,
     paddingBottom: spacing.md,
     backgroundColor: colors.white200,
-    position: "relative",
-    zIndex: 10,
-    elevation: 10,
-  },
-  headerWave: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: -(HEADER_WAVE_HEIGHT - 4),
-    height: HEADER_WAVE_HEIGHT,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.brown100,
   },
   bellWrapper: {
     position: "relative",
@@ -387,7 +399,7 @@ const styles = StyleSheet.create({
     color: colors.white200,
   },
   feedContent: {
-    paddingTop: spacing.md + 20,
+    paddingTop: spacing.md,
     paddingHorizontal: spacing.md,
     paddingBottom: 100,
     alignItems: "center",

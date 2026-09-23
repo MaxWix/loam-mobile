@@ -16,6 +16,7 @@ import { colors } from "../lib/theme";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Font from "expo-font";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { PHONE_VERIFICATION_ENABLED } from "../lib/config";
 
 // Global handler — set once at module scope, not per render. Without it,
 // iOS silently drops notifications that arrive while the app is open.
@@ -87,12 +88,14 @@ function RootLayoutNav() {
         router.replace("/onboarding/age-verify");
       } else if (!data?.onboarding_complete) {
         router.replace("/onboarding/notifications");
-      } else if (needsPhonePrompt) {
-        // Existing accounts predate phone numbers, so they'd never be
-        // findable by contact sync. Asked once — dismissing records a
-        // timestamp so this doesn't reappear at every sign-in.
-        router.replace("/onboarding/verify-phone");
-      } else {
+      }
+      // else if (needsPhonePrompt) {
+      //   // Existing accounts predate phone numbers, so they'd never be
+      //   // findable by contact sync. Asked once — dismissing records a
+      //   // timestamp so this doesn't reappear at every sign-in.
+      //   router.replace("/onboarding/verify-phone");
+      // }
+      else {
         refreshPushTokenIfGranted(supabase, session.user.id);
 
         const [permission, dismissed] = await Promise.all([
